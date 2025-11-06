@@ -3,8 +3,8 @@
 #include <iostream>
 #include <string>
 #include <sstream>
-
-
+#include <algorithm>
+#include <unordered_map>
 
 /*
 Container for all relevant song data from a dataset of spotify songs
@@ -25,6 +25,8 @@ struct song_data {
     double valence;
     double tempo; // needs to be normalized
 
+    
+    
     song_data(std::vector<std::string> d):
         artist(d[2]),
         album(d[3]),
@@ -40,8 +42,18 @@ struct song_data {
     {}
 };
 
+// helper to associate names of songs artists with their artists and index in the larger vector for lookup by name
+std::unordered_map<std::string,std::vector<std::pair<std::string,int>>> getTrack_Artist(const std::vector<song_data>& d){
+    std::unordered_map<std::string,std::vector<std::pair<std::string,int>>> ret;
+    ret.reserve(d.size());
+    for (int i = 0; i < d.size(); i++){
+        ret[d[i].track].emplace_back(std::make_pair(d[i].artist,i));
+    }
+    return ret;
+}
+
 // this is necessary to correctly parse through elements in csv with , in them (which are enclosed in "")
-std::vector<std::string> parseRow(std::string& line){
+std::vector<std::string> parseRow(const std::string& line){
     // there will always be 21 elements max in vector so reserve in advance
     std::vector<std::string> data;
     data.reserve(21);
@@ -68,6 +80,32 @@ std::vector<std::string> parseRow(std::string& line){
     return data;
 }
 
+void normalize(std::vector<song_data>& songs){
+    if (songs.empty()){
+        return;
+    }
+
+    // find the minimum and maximum values of the duration and tempo
+
+    auto minmaxDur = std::minmax_element(songs.begin(),songs.end(),[](const song_data& a, const song_data& b){return a.duration < b.duration;});
+
+    auto minmaxTempo = std::minmax_element(songs.begin(),songs.end(),[](const song_data& a, const song_data& b){return a.tempo < b.tempo;});
+    
+    // store these so they won't be modified as we go through the data
+    double durRange = minmaxDur.second->duration - minmaxDur.first->duration;
+    double tempoRange = minmaxTempo.second->tempo - minmaxTempo.first->tempo;
+
+    double durMin = minmaxDur.first->duration;
+    double tempoMin = minmaxTempo.first->tempo;
+
+    // currNormalized = (curr-min)/(max-min) 
+    // normalize all values
+    for (auto& song : songs){
+        song.duration = (durRange == 0) ? 0 : (song.duration - durMin) / durRange;
+        song.tempo = (tempoRange == 0) ? 0 : (song.tempo - tempoMin) / tempoRange;
+    }
+}
+
 std::vector<song_data> loadData(){
     std::ifstream dataset("./dataset.csv");
     if (!dataset.is_open()){
@@ -75,23 +113,21 @@ std::vector<song_data> loadData(){
     }
     // main processing loop
     std::vector<song_data> data;
+    data.reserve(100000);
     std::string line;
     getline(dataset,line); // skip the header line
     while (std::getline(dataset,line)){
         std::vector<std::string> rowData = parseRow(line);
         data.emplace_back(rowData);
     }
+    normalize(data);
     return data;
 }
 
-
-
-// TODO: normalize duration and tempo
-//std::vector<song_data> normalize(std::vector<song_data>& songs){}
-
 int main() {
-    /* for testing when data loaded < 15 rows
+    /*for testing when data loaded is limited enough to print debug
     auto vec = loadData();
+
     for (auto sd : vec){
         std::cout << "Track info: ";
         std::cout << "Artist: " << sd.artist << std::endl;
@@ -109,6 +145,5 @@ int main() {
 
         std::cout << "\n";
     }*/
-   
     return 0;
 }
