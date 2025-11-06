@@ -1,0 +1,3 @@
+C:/Users/Minh Tran/Desktop/melody map/melody-map/build/CMakeFiles/melody_map.dir
+C:/Users/Minh Tran/Desktop/melody map/melody-map/build/CMakeFiles/edit_cache.dir
+C:/Users/Minh Tran/Desktop/melody map/melody-map/build/CMakeFiles/rebuild_cache.dir
