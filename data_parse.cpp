@@ -98,7 +98,6 @@ void normalize(std::vector<song_data>& songs){
     double durMin = minmaxDur.first->duration;
     double tempoMin = minmaxTempo.first->tempo;
 
-    std::cout << "Duration range: " << durRange << std::endl;
     // currNormalized = (curr-min)/(max-min) 
     // normalize all values
     for (auto& song : songs){
@@ -117,14 +116,9 @@ std::vector<song_data> loadData(){
     data.reserve(100000);
     std::string line;
     getline(dataset,line); // skip the header line
-    int count = 0;
     while (std::getline(dataset,line)){
         std::vector<std::string> rowData = parseRow(line);
         data.emplace_back(rowData);
-        count ++;
-        if (count == 15){
-            break;
-        }
     }
     normalize(data);
     return data;
