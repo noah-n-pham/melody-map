@@ -1,0 +1,8 @@
+[
+{
+  "directory": "C:/Users/Minh Tran/Desktop/melody map/melody-map/build",
+  "command": "C:\\PROGRA~1\\MICROS~4\\18\\Insiders\\VC\\Tools\\MSVC\\1450~1.357\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP -external:I\"C:\\Program Files\\SFML-3.0.2\\include\" -external:W0 /DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /FoCMakeFiles\\melody_map.dir\\gui.cpp.obj /FdCMakeFiles\\melody_map.dir\\ /FS -c \"C:\\Users\\Minh Tran\\Desktop\\melody map\\melody-map\\gui.cpp\"",
+  "file": "C:/Users/Minh Tran/Desktop/melody map/melody-map/gui.cpp",
+  "output": "C:/Users/Minh Tran/Desktop/melody map/melody-map/build/CMakeFiles/melody_map.dir/gui.cpp.obj"
+}
+]
