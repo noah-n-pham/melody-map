@@ -14,8 +14,20 @@ FetchContent_Declare(SFML
     SYSTEM)
 FetchContent_MakeAvailable(SFML)
 
-add_executable(melody_map gui.cpp)
+add_executable(melody_map 
+        data_parse.cpp
+        rNN.cpp
+        )
 
+# adds the dataset to the cwd
+add_custom_command(
+    TARGET melody_map
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/dataset.csv  
+        $<TARGET_FILE_DIR:melody_map>    
+    COMMENT "Copying dataset.csv to executable directory"
+)
 target_include_directories(melody_map PRIVATE
     ${SFML_SOURCE_DIR}/include
     ${SFML_BINARY_DIR}/include
