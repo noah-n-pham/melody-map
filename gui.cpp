@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include "data_parse.h"
 
 using namespace std;
 
@@ -16,9 +17,24 @@ struct SongResult {
         : trackName(name), artist(art), similarity(sim) {}
 };
 
+// helper function to find euclidean distance between two songs
+double calculateDistance(const song_data& a, const song_data& b) {
+    double sum = 0.0;
+    sum += (a.duration - b.duration) * (a.duration - b.duration);
+    sum += (a.energy - b.energy) * (a.energy - b.energy);
+    sum += (a.speechiness - b.speechiness) * (a.speechiness - b.speechiness);
+    sum += (a.acousticness - b.acousticness) * (a.acousticness - b.acousticness);
+    sum += (a.instrumentalness - b.instrumentalness) * (a.instrumentalness - b.instrumentalness);
+    sum += (a.valence - b.valence) * (a.valence - b.valence);
+    sum += (a.tempo - b.tempo) * (a.tempo - b.tempo);
+    return sqrt(sum);
+}
+
 // these are placeholder function declarations for the recommendation algorithms
 // khoi will implement the K-Nearest Neighbors algorithm here
-vector<SongResult> kNearestNeighbors(const string& songName, int k);
+vector<SongResult> kNearestNeighbors(const string& songName, int k){
+}
+
 
 // marcelo will implement the Radius Nearest Neighbors algorithm here
 vector<SongResult> radiusNearestNeighbors(const string& songName, int k);
@@ -372,17 +388,17 @@ public:
 
 // Khoi's K-Nearest Neighbors algorithm
 // This should load the Spotify dataset, calculate distances, and return the k closest songs
-vector<SongResult> kNearestNeighbors(const string& songName, int k) {
-    // TODO: Khoi - Replace this with your actual K-NN implementation
-    // For now, just returning some dummy data so we can test the UI
-    vector<SongResult> results;
-    results.push_back(SongResult("Similar Song 1", "Artist A", 0.95f));
-    results.push_back(SongResult("Similar Song 2", "Artist B", 0.89f));
-    results.push_back(SongResult("Similar Song 3", "Artist C", 0.84f));
-    results.push_back(SongResult("Similar Song 4", "Artist D", 0.80f));
-    results.push_back(SongResult("Similar Song 5", "Artist E", 0.76f));
-    return results;
-}
+// vector<SongResult> kNearestNeighbors(const string& songName, int k) {
+//     // TODO: Khoi - Replace this with your actual K-NN implementation
+//     // For now, just returning some dummy data so we can test the UI
+//     vector<SongResult> results;
+//     results.push_back(SongResult("Similar Song 1", "Artist A", 0.95f));
+//     results.push_back(SongResult("Similar Song 2", "Artist B", 0.89f));
+//     results.push_back(SongResult("Similar Song 3", "Artist C", 0.84f));
+//     results.push_back(SongResult("Similar Song 4", "Artist D", 0.80f));
+//     results.push_back(SongResult("Similar Song 5", "Artist E", 0.76f));
+//     return results;
+// }
 
 // marcelo's Radius Nearest Neighbors algorithm
 // this should find all songs within a certain distance, then return the top k

@@ -1,46 +1,4 @@
-#include <fstream>
-#include <vector>
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <algorithm>
-#include <unordered_map>
-
-/*
-Container for all relevant song data from a dataset of spotify songs
-*/
-struct song_data {
-    // tags
-    std::string artist;
-    std::string album;
-    std::string track;
-    std::string genre;
-    
-    // numbers for distance
-    double duration; // needs to be normalized
-    double energy;
-    double speechiness;
-    double acousticness;
-    double instrumentalness; 
-    double valence;
-    double tempo; // needs to be normalized
-
-    
-    
-    song_data(std::vector<std::string> d):
-        artist(d[2]),
-        album(d[3]),
-        track(d[4]),
-        genre(d[20]),
-        duration(stod(d[6])),
-        energy(stod(d[9])),
-        speechiness(stod(d[13])), 
-        acousticness(stod(d[14])),
-        instrumentalness(stod(d[15])),
-        valence(stod(d[17])),
-        tempo(stod(d[18]))
-    {}
-};
+#include "data_parse.h"
 
 // helper to associate names of songs artists with their artists and index in the larger vector for lookup by name
 std::unordered_map<std::string,std::vector<std::pair<std::string,int>>> getTrack_Artist(const std::vector<song_data>& d){
@@ -122,28 +80,4 @@ std::vector<song_data> loadData(){
     }
     normalize(data);
     return data;
-}
-
-int main() {
-    /*for testing when data loaded is limited enough to print debug
-    auto vec = loadData();
-
-    for (auto sd : vec){
-        std::cout << "Track info: ";
-        std::cout << "Artist: " << sd.artist << std::endl;
-        std::cout << "Album: " << sd.album<< std::endl;
-        std::cout << "Song: " << sd.track << std::endl;
-        std::cout << "Genre: " << sd.genre << std::endl;
-
-        std::cout << "Duration: " << sd.duration << std::endl;
-        std::cout << "Energy :" << sd.energy << std::endl;
-        std::cout << "Speechiness: " << sd.speechiness << std::endl;
-        std::cout << "Acousticness: " << sd.acousticness << std::endl;
-        std::cout << "Instrumentalness: " << sd.instrumentalness << std::endl;
-        std::cout << "Valence: " << sd.valence << std::endl;
-        std::cout << "Tempo: " << sd.tempo << std::endl;
-
-        std::cout << "\n";
-    }*/
-    return 0;
 }

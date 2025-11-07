@@ -1,34 +1,37 @@
 cmake_minimum_required(VERSION 3.20)
-project(melody_map)
+project(melody_map LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# Path to your SFML 3 installation
-set(SFML_DIR "C:/Program Files/SFML-3.0.2/lib/cmake/SFML")
+# Use FetchContent to automatically download and build SFML (more portable)
+include(FetchContent)
 
-# Find SFML 3 (minimum version 3.0.2)
-find_package(SFML 3.0.2 REQUIRED COMPONENTS Graphics Window System)
+FetchContent_Declare(SFML
+    GIT_REPOSITORY https://github.com/SFML/SFML.git
+    GIT_TAG 3.0.2
+    GIT_SHALLOW ON
+    EXCLUDE_FROM_ALL
+    SYSTEM)
 
-# Add your source file
+FetchContent_MakeAvailable(SFML)
+
+# Add both source files
 add_executable(melody_map 
-    "C:/Users/Minh Tran/Desktop/melody map/melody-map/gui.cpp"
+    gui.cpp
+    data_parse.cpp
 )
 
-# Link SFML libraries (note the correct target name here)
+# Include SFML headers
+target_include_directories(melody_map PRIVATE
+    ${SFML_SOURCE_DIR}/include
+    ${SFML_BINARY_DIR}/include
+)
+
+# Link SFML libraries
 target_link_libraries(melody_map
     PRIVATE
         SFML::Graphics
         SFML::Window
         SFML::System
 )
-
-# Copy necessary SFML DLLs to the build directory after building
-if(WIN32)
-    add_custom_command(TARGET melody_map POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:SFML::Graphics>
-            $<TARGET_FILE:SFML::Window>
-            $<TARGET_FILE:SFML::System>
-            $<TARGET_FILE_DIR:melody_map>
-    )
-endif()
