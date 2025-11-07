@@ -15,6 +15,7 @@ FetchContent_Declare(SFML
 FetchContent_MakeAvailable(SFML)
 
 add_executable(melody_map 
+        gui.cpp
         data_parse.cpp
         rNN.cpp
         )

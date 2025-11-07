@@ -1,5 +1,6 @@
 // this is for the radius nearest neighbors algorithm
 #include <cmath> // for sqrt
+#include <unordered_set>
 #include "data_parse.h"
 
 // does this here so it is not recalculted for every iteration
