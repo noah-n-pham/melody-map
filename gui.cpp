@@ -2,19 +2,9 @@
 #include <iostream>
 #include <vector>
 #include <string>
-
+#include "data_parse.h"
+#include "rNN.h" // has the radius nearest neighbors algo
 using namespace std;
-
-// this struct holds information about each recommended song
-// it stores the track name, artist, and how similar it is to the search query (0.0 to 1.0)
-struct SongResult {
-    string trackName;
-    string artist;
-    float similarity;
-    
-    SongResult(const string& name, const string& art, float sim)
-        : trackName(name), artist(art), similarity(sim) {}
-};
 
 // these are placeholder function declarations for the recommendation algorithms
 // khoi will implement the K-Nearest Neighbors algorithm here
