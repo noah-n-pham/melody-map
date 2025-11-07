@@ -1,48 +1,7 @@
-#include <fstream>
-#include <vector>
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <algorithm>
-#include <unordered_map>
+#include "data_parse.h"
 
-/*
-Container for all relevant song data from a dataset of spotify songs
-*/
-struct song_data {
-    // tags
-    std::string artist;
-    std::string album;
-    std::string track;
-    std::string genre;
-    
-    // numbers for distance
-    double duration; // needs to be normalized
-    double energy;
-    double speechiness;
-    double acousticness;
-    double instrumentalness; 
-    double valence;
-    double tempo; // needs to be normalized
 
-    
-    
-    song_data(std::vector<std::string> d):
-        artist(d[2]),
-        album(d[3]),
-        track(d[4]),
-        genre(d[20]),
-        duration(stod(d[6])),
-        energy(stod(d[9])),
-        speechiness(stod(d[13])), 
-        acousticness(stod(d[14])),
-        instrumentalness(stod(d[15])),
-        valence(stod(d[17])),
-        tempo(stod(d[18]))
-    {}
-};
 
-// helper to associate names of songs artists with their artists and index in the larger vector for lookup by name
 std::unordered_map<std::string,std::vector<std::pair<std::string,int>>> getTrack_Artist(const std::vector<song_data>& d){
     std::unordered_map<std::string,std::vector<std::pair<std::string,int>>> ret;
     ret.reserve(d.size());
@@ -52,7 +11,7 @@ std::unordered_map<std::string,std::vector<std::pair<std::string,int>>> getTrack
     return ret;
 }
 
-// this is necessary to correctly parse through elements in csv with , in them (which are enclosed in "")
+
 std::vector<std::string> parseRow(const std::string& line){
     // there will always be 21 elements max in vector so reserve in advance
     std::vector<std::string> data;
@@ -124,8 +83,9 @@ std::vector<song_data> loadData(){
     return data;
 }
 
+/*
 int main() {
-    /*for testing when data loaded is limited enough to print debug
+    for testing when data loaded is limited enough to print debug
     auto vec = loadData();
 
     for (auto sd : vec){
@@ -144,6 +104,6 @@ int main() {
         std::cout << "Tempo: " << sd.tempo << std::endl;
 
         std::cout << "\n";
-    }*/
+    }
     return 0;
-}
+}*/
