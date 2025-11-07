@@ -6,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 #include <unordered_map>
+#include <filesystem> // need c++ 17
 
 /*
 Container for all relevant song data from a dataset of spotify songs
@@ -41,6 +42,33 @@ struct song_data {
         valence(stod(d[17])),
         tempo(stod(d[18]))
     {}
+
+    // for debug purposes
+    void Print(){
+              std::cout << "Artist: " << artist << std::endl;
+        std::cout << "Album: " << album<< std::endl;
+        std::cout << "Song: " << track << std::endl;
+        std::cout << "Genre: " << genre << std::endl;
+
+        std::cout << "Duration: " << duration << std::endl;
+        std::cout << "Energy :" << energy << std::endl;
+        std::cout << "Speechiness: " << speechiness << std::endl;
+        std::cout << "Acousticness: " << acousticness << std::endl;
+        std::cout << "Instrumentalness: " << instrumentalness << std::endl;
+        std::cout << "Valence: " << valence << std::endl;
+        std::cout << "Tempo: " << tempo << std::endl;
+    }
+};
+
+// this struct holds information about each recommended song
+// it stores the track name, artist, and how similar it is to the search query (0.0 to 1.0)
+struct SongResult {
+    std::string trackName;
+    std::string artist;
+    float similarity;
+    
+    SongResult(const std::string& name, const std::string& art, float sim)
+        : trackName(name), artist(art), similarity(sim) {}
 };
 
 /* 
@@ -62,6 +90,8 @@ void normalize(std::vector<song_data>& songs);
 
 /* 
 loads all data from the dataset.csv file of spotify song data 
-returns a vector of all the songs data in structs
+returns a vector of all the songs data in structs.
+MAIN HAS TO TAKE IN ARGC ARGV AND PASS ARGV[0] to loadData otherwise it will NOT
+be able to find dataset.csv to load it
 */
-std::vector<song_data> loadData();
+std::vector<song_data> loadData(std::string exePath);

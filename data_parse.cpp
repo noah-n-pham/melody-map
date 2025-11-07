@@ -65,8 +65,14 @@ void normalize(std::vector<song_data>& songs){
     }
 }
 
-std::vector<song_data> loadData(){
-    std::ifstream dataset("./dataset.csv");
+std::vector<song_data> loadData(std::string exePath){
+    // the following 3 lines find the dataset path across systems
+    // this is necessary for the file to be properly opened
+    std::filesystem::path exPath(exePath);
+    std::filesystem::path Pdirectory = exPath.parent_path();
+    std::filesystem::path datasetPath = Pdirectory/"dataset.csv";
+
+    std::ifstream dataset(datasetPath.string());
     if (!dataset.is_open()){
         throw std::runtime_error("Failed to open file");
     }
@@ -82,28 +88,3 @@ std::vector<song_data> loadData(){
     normalize(data);
     return data;
 }
-
-/*
-int main() {
-    for testing when data loaded is limited enough to print debug
-    auto vec = loadData();
-
-    for (auto sd : vec){
-        std::cout << "Track info: ";
-        std::cout << "Artist: " << sd.artist << std::endl;
-        std::cout << "Album: " << sd.album<< std::endl;
-        std::cout << "Song: " << sd.track << std::endl;
-        std::cout << "Genre: " << sd.genre << std::endl;
-
-        std::cout << "Duration: " << sd.duration << std::endl;
-        std::cout << "Energy :" << sd.energy << std::endl;
-        std::cout << "Speechiness: " << sd.speechiness << std::endl;
-        std::cout << "Acousticness: " << sd.acousticness << std::endl;
-        std::cout << "Instrumentalness: " << sd.instrumentalness << std::endl;
-        std::cout << "Valence: " << sd.valence << std::endl;
-        std::cout << "Tempo: " << sd.tempo << std::endl;
-
-        std::cout << "\n";
-    }
-    return 0;
-}*/
