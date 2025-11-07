@@ -17,6 +17,7 @@ FetchContent_MakeAvailable(SFML)
 add_executable(melody_map 
         data_parse.cpp
         rNN.cpp
+        gui.cpp
         )
 
 # adds the dataset to the cwd

@@ -2,54 +2,74 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <unordered_map>
+#include <algorithm>
 #include "data_parse.h"
-#include "rNN.h" // has the radius nearest neighbors algo
+
 using namespace std;
 
-// these are placeholder function declarations for the recommendation algorithms
-// khoi will implement the K-Nearest Neighbors algorithm here
-vector<SongResult> kNearestNeighbors(const string& songName, int k);
+// khoi will implement the k-nearest neighbors algorithm
+vector<SongResult> kNearestNeighbors(const string& songName, int k, 
+                                     const vector<song_data>& allSongs,
+                                     const unordered_map<string, vector<pair<string, int>>>& trackArtistMap);
 
-// marcelo will implement the Radius Nearest Neighbors algorithm here
-vector<SongResult> radiusNearestNeighbors(const string& songName, int k);
+// marcelo will implement the radius nearest neighbors algorithm
+vector<SongResult> radiusNearestNeighbors(const string& songName, int k,
+                                          const vector<song_data>& allSongs,
+                                          const unordered_map<string, vector<pair<string, int>>>& trackArtistMap);
 
 class MelodyMapUI {
 private:
-    // main window and font for the entire application
     sf::RenderWindow window;
     sf::Font font;
     
-    // these are the visual boxes on screen 
-    sf::RectangleShape searchBox;       // the box where you type the song name
-    sf::RectangleShape dropdownBox;     // the box that shows which algorithm is selected
-    sf::RectangleShape searchButton;    // the green "Search" button
-    sf::RectangleShape resultsPanel;    // the big panel at the bottom that shows results
+    vector<song_data> allSongs;
+    unordered_map<string, vector<pair<string, int>>> trackArtistMap;
     
-    // all the text elements that display information to the user
-    sf::Text titleText;         // "Melody Map" at the top
-    sf::Text searchLabel;       // "Enter Song Name:" label
-    sf::Text inputText;         // the actual textinput inna search box
-    sf::Text algorithmLabel;    // "Select Algorithm:" label
-    sf::Text dropdownText;      // shows which algorithm is currently selected
-    sf::Text buttonText;        // "Search" text on the button
-    vector<sf::Text> resultTexts; //all the recommended songs displayed in the results panel which icurrently have as a placeholder dummy 
+    // main ui boxes
+    sf::RectangleShape searchBox;
+    sf::RectangleShape dropdownBox;
+    sf::RectangleShape searchButton;
+    sf::RectangleShape resultsPanel;
     
-    // these variables keep track of the current state of the UI
-    string userInput;               // what the user has typed so far
-    string selectedAlgorithm;       // which algorithm is currently selected (K-NN or Radius)
-    bool dropdownOpen;              // whether the dropdown menu is currently open
-    bool isSearching;               // whether we're currently running a search
-    bool searchBoxFocused;          // whether the search box is active and ready for typing
-    vector<SongResult> results;     // the list of recommended songs to display
-    sf::Clock cursorClock;          // timer for making the cursor blink
-    bool showCursor;                // controls whether the cursor is visible right now
+    // autocomplete stuff
+    sf::RectangleShape suggestionsBox;
+    vector<sf::RectangleShape> suggestionBoxes;
+    vector<sf::Text> suggestionTexts;
     
-    // window dimensions size on screen editable for half screen or popups
+    // text labels
+    sf::Text titleText;
+    sf::Text searchLabel;
+    sf::Text inputText;
+    sf::Text algorithmLabel;
+    sf::Text dropdownText;
+    sf::Text buttonText;
+    vector<sf::Text> resultTexts;
+    
+    // state variables
+    string userInput;
+    string selectedAlgorithm;
+    bool dropdownOpen;
+    bool isSearching;
+    bool searchBoxFocused;
+    vector<SongResult> results;
+    sf::Clock cursorClock;
+    bool showCursor;
+    
+    // autocomplete state
+    bool showSuggestions;
+    vector<pair<string, string>> currentSuggestions;
+    int selectedSuggestionIndex;
+    const int MAX_SUGGESTIONS = 8;
+    
     const unsigned int WINDOW_WIDTH = 1000;
     const unsigned int WINDOW_HEIGHT = 800;
     
+    // used to prevent double-clicking on suggestions
+    sf::Clock clickClock;
+    const float CLICK_DELAY = 0.15f;
+    
 public:
-    // constructor - sets up the window and initializes all the text elements
     MelodyMapUI() : 
         titleText(font),
         searchLabel(font),
@@ -58,14 +78,26 @@ public:
         dropdownText(font),
         buttonText(font) {
         
-        // create the window with our specified dimensions
         window.create(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Melody Map - Song Recommender");
-        window.setFramerateLimit(60); //60 fps limit, good rule of
+        window.setFramerateLimit(60);
         
-        // font loading
+        // load all the songs from the csv
+        cout << "Loading Spotify dataset..." << endl;
+        try {
+            allSongs = loadData("dataset.csv");
+            trackArtistMap = getTrack_Artist(allSongs);
+            cout << "Successfully loaded " << allSongs.size() << " songs!" << endl;
+        } catch (const exception& e) {
+            cerr << "ERROR: Failed to load dataset! " << e.what() << endl;
+        }
+        
+        // try to find a font that works
         bool fontLoaded = false;
         vector<string> fontPaths = {
-            "C:/Windows/Fonts/arial.ttf",       // standard Windows Arial location; add multiple fonts here in case u wanan swap em
+            "arial.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "C:/Windows/Fonts/segoeui.ttf",
+            "C:/Windows/Fonts/calibri.ttf"
         };
         
         for (const auto& path : fontPaths) {
@@ -77,164 +109,247 @@ public:
         }
         
         if (!fontLoaded) {
-            cerr << "ERROR: Could not load any font! The UI will not display text correctly." << endl;
-            cerr << "Please ensure you have a font file available." << endl;
+            cerr << "ERROR: Could not load any font!" << endl;
         }
         
-        // set up our initial stuff
-        selectedAlgorithm = "K-Nearest Neighbors";  
-        dropdownOpen = false;                        
-        isSearching = false;                         
-        searchBoxFocused = true;                     
-        showCursor = true;                           
+        // set default values
+        selectedAlgorithm = "K-Nearest Neighbors";
+        dropdownOpen = false;
+        isSearching = false;
+        searchBoxFocused = true;
+        showCursor = true;
+        showSuggestions = false;
+        selectedSuggestionIndex = -1;
         
         initializeUI();
     }
     
-    //this function positions and styles all the UI elements on the screen
+    // set up all the visual elements
     void initializeUI() {
-        //set up the main title at the top - "Melody Map"
         titleText.setString("Melody Map");
         titleText.setCharacterSize(48u);
-        titleText.setFillColor(sf::Color(30u, 215u, 96u)); // Spotify green - looks modern!
+        titleText.setFillColor(sf::Color(30u, 215u, 96u));
         titleText.setPosition({static_cast<float>(WINDOW_WIDTH) / 2.f - 150.f, 30.f});
         
-        // label that says "Enter Song Name:"
         searchLabel.setString("Enter Song Name:");
         searchLabel.setCharacterSize(20u);
         searchLabel.setFillColor(sf::Color::White);
         searchLabel.setPosition({50.f, 120.f});
         
-        // the actual input box where users type
         searchBox.setSize({500.f, 40.f});
         searchBox.setPosition({50.f, 150.f});
-        searchBox.setFillColor(sf::Color(50u, 50u, 50u));      // Dark gray background
-        searchBox.setOutlineColor(sf::Color(100u, 100u, 100u)); // Lighter gray border
+        searchBox.setFillColor(sf::Color(50u, 50u, 50u));
+        searchBox.setOutlineColor(sf::Color(100u, 100u, 100u));
         searchBox.setOutlineThickness(2.f);
         
-        // the text that appears inside the search box (what you type)
         inputText.setCharacterSize(18u);
         inputText.setFillColor(sf::Color::White);
-        inputText.setPosition({60.f, 158.f}); // Slightly indented from the box edge
+        inputText.setPosition({60.f, 158.f});
         
-        //label for the algorithm dropdown - "Select Algorithm:"
         algorithmLabel.setString("Select Algorithm:");
         algorithmLabel.setCharacterSize(20u);
         algorithmLabel.setFillColor(sf::Color::White);
         algorithmLabel.setPosition({600.f, 120.f});
         
-        // the dropdown box that shows which algorithm is selected
         dropdownBox.setSize({300.f, 40.f});
         dropdownBox.setPosition({600.f, 150.f});
         dropdownBox.setFillColor(sf::Color(50u, 50u, 50u));
         dropdownBox.setOutlineColor(sf::Color(100u, 100u, 100u));
         dropdownBox.setOutlineThickness(2.f);
         
-        // text inside the dropdown showing the current selection
         dropdownText.setString(selectedAlgorithm);
         dropdownText.setCharacterSize(18u);
         dropdownText.setFillColor(sf::Color::White);
         dropdownText.setPosition({610.f, 158.f});
         
-        // the big green "Search" button
         searchButton.setSize({150.f, 50.f});
         searchButton.setPosition({static_cast<float>(WINDOW_WIDTH) / 2.f - 75.f, 220.f});
-        searchButton.setFillColor(sf::Color(30u, 215u, 96u)); // Same Spotify green as title
+        searchButton.setFillColor(sf::Color(30u, 215u, 96u));
         
-        // "search" text on the button
         buttonText.setString("Search");
         buttonText.setCharacterSize(24u);
-        buttonText.setFillColor(sf::Color::Black); // Black text on green button for good contrast
+        buttonText.setFillColor(sf::Color::Black);
         buttonText.setPosition({static_cast<float>(WINDOW_WIDTH) / 2.f - 40.f, 230.f});
         
-        // large panel at the bottom where we display all the song recommendations
         resultsPanel.setSize({900.f, 450.f});
         resultsPanel.setPosition({50.f, 300.f});
-        resultsPanel.setFillColor(sf::Color(30u, 30u, 30u));    // Very dark gray
+        resultsPanel.setFillColor(sf::Color(30u, 30u, 30u));
         resultsPanel.setOutlineColor(sf::Color(100u, 100u, 100u));
         resultsPanel.setOutlineThickness(2.f);
+        
+        suggestionsBox.setFillColor(sf::Color(40u, 40u, 40u));
+        suggestionsBox.setOutlineColor(sf::Color(100u, 100u, 100u));
+        suggestionsBox.setOutlineThickness(2.f);
     }
     
-    // this function handles all user input - keyboard typing and mouse clicks
+    // figure out what songs match what the user typed
+    void updateSuggestions() {
+        currentSuggestions.clear();
+        selectedSuggestionIndex = -1;
+        
+        // need at least 2 characters before we start suggesting
+        if (userInput.empty() || userInput.length() < 2) {
+            showSuggestions = false;
+            return;
+        }
+        
+        // make everything lowercase so we can search better
+        string lowerInput = userInput;
+        transform(lowerInput.begin(), lowerInput.end(), lowerInput.begin(), ::tolower);
+        
+        // go through all the songs and find matches
+        for (const auto& [trackName, artistList] : trackArtistMap) {
+            string lowerTrack = trackName;
+            transform(lowerTrack.begin(), lowerTrack.end(), lowerTrack.begin(), ::tolower);
+            
+            // if the song name has what we typed in it, add it to suggestions
+            if (lowerTrack.find(lowerInput) != string::npos) {
+                currentSuggestions.push_back({trackName, artistList[0].first});
+                
+                if (currentSuggestions.size() >= MAX_SUGGESTIONS) break;
+            }
+        }
+        
+        showSuggestions = !currentSuggestions.empty();
+    }
+    
+    // when someone picks a suggestion, fill it into the search box
+    void selectSuggestion(int index) {
+        if (index >= 0 && index < currentSuggestions.size()) {
+            userInput = currentSuggestions[index].first;
+            inputText.setString(userInput);
+            showSuggestions = false;
+            selectedSuggestionIndex = -1;
+        }
+    }
+    
+    // handle typing, clicking, arrow keys, etc
     void handleInput(const sf::Event& event) {
-        // check if the user typed something on the keyboard
-        if (event.is<sf::Event::TextEntered>() && searchBoxFocused) {
+        // when someone types something
+        if (event.is<sf::Event::TextEntered>() && searchBoxFocused && !dropdownOpen) {
             const auto& textEvent = *event.getIf<sf::Event::TextEntered>();
             
             if (textEvent.unicode == 8 && !userInput.empty()) {
-                // backspace pressed - delete the last character
+                // backspace - delete last character
                 userInput.pop_back();
+                inputText.setString(userInput);
+                updateSuggestions();
             } else if (textEvent.unicode == 13) {
-                // enter key pressed - run the search if there's input
-                if (!userInput.empty()) {
+                // enter key - either pick a suggestion or search
+                if (showSuggestions && selectedSuggestionIndex >= 0) {
+                    selectSuggestion(selectedSuggestionIndex);
+                } else if (!userInput.empty()) {
                     performSearch();
                 }
             } else if (textEvent.unicode >= 32 && textEvent.unicode < 128) {
-                // normal printable character - add it to the input
+                // regular character like a letter or number
                 userInput += static_cast<char>(textEvent.unicode);
+                inputText.setString(userInput);
+                updateSuggestions();
             }
-            // update the displayed text with the new input
-            inputText.setString(userInput);
         }
         
+        // arrow keys to navigate suggestions
+        if (event.is<sf::Event::KeyPressed>() && showSuggestions && searchBoxFocused) {
+            const auto& keyEvent = *event.getIf<sf::Event::KeyPressed>();
+            
+            if (keyEvent.code == sf::Keyboard::Key::Down) {
+                selectedSuggestionIndex = min(selectedSuggestionIndex + 1, 
+                                             static_cast<int>(currentSuggestions.size()) - 1);
+            } else if (keyEvent.code == sf::Keyboard::Key::Up) {
+                selectedSuggestionIndex = max(selectedSuggestionIndex - 1, -1);
+            } else if (keyEvent.code == sf::Keyboard::Key::Escape) {
+                // escape key closes suggestions
+                showSuggestions = false;
+                selectedSuggestionIndex = -1;
+            }
+        }
+        
+        // mouse clicks
         if (event.is<sf::Event::MouseButtonPressed>()) {
+            // only process if enough time has passed since last click
+            if (clickClock.getElapsedTime().asSeconds() < CLICK_DELAY) {
+                return;
+            }
+            
             sf::Vector2f mousePos = sf::Vector2f(sf::Mouse::getPosition(window));
+            bool clickedAnywhere = false;
+            
+            // did they click the search box?
             if (searchBox.getGlobalBounds().contains(mousePos)) {
                 searchBoxFocused = true;
-            } else {
-            
-                searchBoxFocused = false;
+                if (!userInput.empty()) {
+                    updateSuggestions();
+                }
+                clickedAnywhere = true;
             }
             
-            
+            // did they click the algorithm dropdown?
             if (dropdownBox.getGlobalBounds().contains(mousePos)) {
                 dropdownOpen = !dropdownOpen;
+                showSuggestions = false;
+                clickedAnywhere = true;
             }
             
-            
+            // did they click the search button?
             if (searchButton.getGlobalBounds().contains(mousePos) && !userInput.empty()) {
                 performSearch();
+                clickedAnywhere = true;
+            }
+            
+            // did they click on one of the suggestions?
+            if (showSuggestions) {
+                bool clickedSuggestion = false;
+                for (size_t i = 0; i < suggestionBoxes.size(); ++i) {
+                    if (suggestionBoxes[i].getGlobalBounds().contains(mousePos)) {
+                        selectSuggestion(i);
+                        clickedSuggestion = true;
+                        clickedAnywhere = true;
+                        clickClock.restart();
+                        break;
+                    }
+                }
+            }
+            
+            // if they clicked somewhere else, close everything
+            if (!clickedAnywhere) {
+                searchBoxFocused = false;
+                showSuggestions = false;
             }
         }
     }
     
-    // this function runs the selected algorithm and gets the song recommendations
+    // run the search algorithm
     void performSearch() {
-        isSearching = true;     
-        results.clear();         
+        isSearching = true;
+        results.clear();
+        showSuggestions = false;
         
-        // call the appropriate algorithm based on what's selected in the dropdown
         if (selectedAlgorithm == "K-Nearest Neighbors") {
-            // Khoi's K-NN algorithm will be called here
-            results = kNearestNeighbors(userInput, 10);
+            results = kNearestNeighbors(userInput, 10, allSongs, trackArtistMap);
         } else {
-            // Marcelo's Radius algorithm will be called here
-            results = radiusNearestNeighbors(userInput, 10);
+            results = radiusNearestNeighbors(userInput, 10, allSongs, trackArtistMap);
         }
         
-        // update the UI to show the new results
         updateResultsDisplay();
-        isSearching = false;     // Done searching
+        isSearching = false;
     }
     
-    // this function takes the search results and formats them nicely for display
+    // format the search results so they look nice
     void updateResultsDisplay() {
-        resultTexts.clear(); // Clear out any old results
+        resultTexts.clear();
         
-        // add a header that says "Top Recommendations:"
         sf::Text header(font);
         header.setString("Top Recommendations:");
         header.setCharacterSize(24u);
-        header.setFillColor(sf::Color(30u, 215u, 96u)); // Green header to match theme
+        header.setFillColor(sf::Color(30u, 215u, 96u));
         header.setPosition({70.f, 320.f});
         resultTexts.push_back(header);
         
-        // loop through each result and create a formatted text line for it
-        float yPos = 370.f; // Starting Y position for the first result
+        float yPos = 370.f;
         for (size_t i = 0; i < results.size(); ++i) {
             sf::Text result(font);
             
-            // format: "1. Song Name - Artist Name (95% match)"
             string resultStr = to_string(i + 1) + ". " + 
                               results[i].trackName + " - " + 
                               results[i].artist + " (" + 
@@ -246,18 +361,15 @@ public:
             result.setPosition({70.f, yPos});
             resultTexts.push_back(result);
             
-            yPos += 35.f; // move down for the next result
+            yPos += 35.f;
         }
     }
     
-    // this function draws the dropdown menu options when it's open
+    // draw the algorithm selection dropdown
     void drawDropdownOptions() {
-        // our two algorithm choices
         vector<string> options = {"K-Nearest Neighbors", "Radius Nearest Neighbors"};
         
-        // ddraw a box for each option
         for (size_t i = 0; i < options.size(); ++i) {
-            // create a box for this option
             sf::RectangleShape optionBox;
             optionBox.setSize({300.f, 40.f});
             optionBox.setPosition({600.f, 190.f + static_cast<float>(i) * 40.f});
@@ -265,58 +377,109 @@ public:
             optionBox.setOutlineColor(sf::Color(100u, 100u, 100u));
             optionBox.setOutlineThickness(1.f);
             
-            // add text showing the option name
             sf::Text optionText(font);
             optionText.setString(options[i]);
             optionText.setCharacterSize(18u);
             optionText.setFillColor(sf::Color::White);
             optionText.setPosition({610.f, 198.f + static_cast<float>(i) * 40.f});
             
-            // check if the mouse is hovering over this option
             sf::Vector2f mousePos = sf::Vector2f(sf::Mouse::getPosition(window));
             if (optionBox.getGlobalBounds().contains(mousePos)) {
-                // highlight the box if we're hovering
                 optionBox.setFillColor(sf::Color(100u, 100u, 100u));
                 
-                // if the user clicks while hovering, select this algorithm
                 if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
                     selectedAlgorithm = options[i];
                     dropdownText.setString(selectedAlgorithm);
-                    dropdownOpen = false; // close the dropdown after selection
+                    dropdownOpen = false;
                 }
             }
             
-            // draw the option box and text
             window.draw(optionBox);
             window.draw(optionText);
         }
     }
     
-    // main application loop - keeps the window running and handles all drawing
+    // draw the autocomplete suggestions dropdown
+    void drawSuggestions() {
+        if (!showSuggestions || currentSuggestions.empty()) return;
+        
+        suggestionBoxes.clear();
+        suggestionTexts.clear();
+        
+        float suggestionHeight = 35.f;
+        float totalHeight = suggestionHeight * currentSuggestions.size();
+        
+        // draw the container for all suggestions
+        suggestionsBox.setSize({500.f, totalHeight});
+        suggestionsBox.setPosition({50.f, 192.f});
+        window.draw(suggestionsBox);
+        
+        // figure out where the mouse is
+        sf::Vector2f mousePos = sf::Vector2f(sf::Mouse::getPosition(window));
+        
+        // draw each individual suggestion
+        for (size_t i = 0; i < currentSuggestions.size(); ++i) {
+            sf::RectangleShape suggestionBox;
+            suggestionBox.setSize({500.f, suggestionHeight});
+            suggestionBox.setPosition({50.f, 192.f + static_cast<float>(i) * suggestionHeight});
+            
+            // highlight it if mouse is over it or if its selected with arrow keys
+            bool isHovered = suggestionBox.getGlobalBounds().contains(mousePos);
+            bool isSelected = (i == selectedSuggestionIndex);
+            
+            if (isSelected || isHovered) {
+                suggestionBox.setFillColor(sf::Color(70u, 70u, 70u));
+            } else {
+                suggestionBox.setFillColor(sf::Color(45u, 45u, 45u));
+            }
+            
+            suggestionBoxes.push_back(suggestionBox);
+            window.draw(suggestionBox);
+            
+            // draw the text showing the song and artist
+            sf::Text suggestionText(font);
+            string displayText = currentSuggestions[i].first + " - " + currentSuggestions[i].second;
+            
+            // cut it off if its too long
+            if (displayText.length() > 60) {
+                displayText = displayText.substr(0, 57) + "...";
+            }
+            
+            suggestionText.setString(displayText);
+            suggestionText.setCharacterSize(16u);
+            suggestionText.setFillColor(sf::Color::White);
+            suggestionText.setPosition({60.f, 198.f + static_cast<float>(i) * suggestionHeight});
+            
+            suggestionTexts.push_back(suggestionText);
+            window.draw(suggestionText);
+        }
+    }
+    
+    // main loop that keeps everything running
     void run() {
         while (window.isOpen()) {
-            // check for any events (mouse clicks, key presses, window close, etc.)
             while (const optional event = window.pollEvent()) {
                 if (event->is<sf::Event::Closed>()) {
-                    window.close(); // User clicked the X button
+                    window.close();
                 }
                 
                 handleInput(*event);
             }
             
-            // Make the cursor blink every half second
+            // make the cursor blink
             if (cursorClock.getElapsedTime().asSeconds() > 0.5f) {
-                showCursor = !showCursor;  
-                cursorClock.restart();          
+                showCursor = !showCursor;
+                cursorClock.restart();
             }
             
+            // change the search box color based on if its selected
             if (searchBoxFocused) {
-                searchBox.setOutlineColor(sf::Color(30u, 215u, 96u)); // Green = ready to type!
+                searchBox.setOutlineColor(sf::Color(30u, 215u, 96u));
             } else {
-                searchBox.setOutlineColor(sf::Color(100u, 100u, 100u)); // Gray = not focused
+                searchBox.setOutlineColor(sf::Color(100u, 100u, 100u));
             }
             
-            // clear the window with a dark background color
+            // clear the screen and start drawing
             window.clear(sf::Color(18u, 18u, 18u));
             
             window.draw(titleText);
@@ -324,6 +487,7 @@ public:
             window.draw(searchBox);
             window.draw(inputText);
             
+            // draw the blinking cursor
             if (searchBoxFocused && showCursor) {
                 sf::RectangleShape cursor;
                 cursor.setSize({2.f, 20.f});
@@ -334,7 +498,6 @@ public:
                 window.draw(cursor);
             }
             
-            // draw the rest of the UI
             window.draw(algorithmLabel);
             window.draw(dropdownBox);
             window.draw(dropdownText);
@@ -342,53 +505,152 @@ public:
             window.draw(buttonText);
             window.draw(resultsPanel);
             
-            // ff the dropdown menu is open, draw the options
+            // draw the algorithm dropdown if its open
             if (dropdownOpen) {
                 drawDropdownOptions();
             }
             
-            // draw all the search results
+            // draw autocomplete suggestions if there are any
+            if (showSuggestions && !dropdownOpen) {
+                drawSuggestions();
+            }
+            
+            // draw the search results
             for (const auto& text : resultTexts) {
                 window.draw(text);
             }
             
-            // display everything we just drew
             window.display();
         }
     }
 };
 
-//dummies below implementation
+// helper to calculate distance between two songs based on their features
+double calculateDistance(const song_data& song1, const song_data& song2) {
+    return sqrt(
+        pow(song1.duration - song2.duration, 2) +
+        pow(song1.energy - song2.energy, 2) +
+        pow(song1.speechiness - song2.speechiness, 2) +
+        pow(song1.acousticness - song2.acousticness, 2) +
+        pow(song1.instrumentalness - song2.instrumentalness, 2) +
+        pow(song1.valence - song2.valence, 2) +
+        pow(song1.tempo - song2.tempo, 2)
+    );
+}
 
-// Khoi's K-Nearest Neighbors algorithm
-// This should load the Spotify dataset, calculate distances, and return the k closest songs
-vector<SongResult> kNearestNeighbors(const string& songName, int k) {
-    // TODO: Khoi - Replace this with your actual K-NN implementation
-    // For now, just returning some dummy data so we can test the UI
+// khoi's k-nearest neighbors implementation
+// finds the k closest songs to the one you searched for
+vector<SongResult> kNearestNeighbors(const string& songName, int k,
+                                     const vector<song_data>& allSongs,
+                                     const unordered_map<string, vector<pair<string, int>>>& trackArtistMap) {
     vector<SongResult> results;
-    results.push_back(SongResult("Similar Song 1", "Artist A", 0.95f));
-    results.push_back(SongResult("Similar Song 2", "Artist B", 0.89f));
-    results.push_back(SongResult("Similar Song 3", "Artist C", 0.84f));
-    results.push_back(SongResult("Similar Song 4", "Artist D", 0.80f));
-    results.push_back(SongResult("Similar Song 5", "Artist E", 0.76f));
+    
+    // try to find the song in our database
+    auto it = trackArtistMap.find(songName);
+    if (it == trackArtistMap.end()) {
+        cout << "Song '" << songName << "' not found in database." << endl;
+        return results;
+    }
+    
+    // get the song they searched for
+    int targetIndex = it->second[0].second;
+    const song_data& targetSong = allSongs[targetIndex];
+    
+    cout << "Found song: " << targetSong.track << " by " << targetSong.artist << endl;
+    
+    // calculate how far away every other song is
+    vector<pair<double, int>> distances;
+    distances.reserve(allSongs.size());
+    
+    for (int i = 0; i < allSongs.size(); i++) {
+        if (i == targetIndex) continue;
+        
+        double dist = calculateDistance(targetSong, allSongs[i]);
+        distances.push_back({dist, i});
+    }
+    
+    // sort so the closest songs are first
+    sort(distances.begin(), distances.end());
+    
+    // grab the k closest songs
+    for (int i = 0; i < min(k, (int)distances.size()); i++) {
+        int songIndex = distances[i].second;
+        double distance = distances[i].first;
+        
+        // turn distance into a percentage (closer = higher percentage)
+        float similarity = 1.0f / (1.0f + distance);
+        
+        results.push_back(SongResult(
+            allSongs[songIndex].track,
+            allSongs[songIndex].artist,
+            similarity
+        ));
+    }
+    
+    cout << "Found " << results.size() << " similar songs using K-NN!" << endl;
     return results;
 }
 
-// marcelo's Radius Nearest Neighbors algorithm
-// this should find all songs within a certain distance, then return the top k
-vector<SongResult> radiusNearestNeighbors(const string& songName, int k) {
-    // TODO: Marcelo - Replace this with your actual Radius algorithm
-    // for now, just returning some dummy data so we can test the UI
+// marcelo's radius nearest neighbors implementation
+// finds all songs within a certain distance, then returns the top k
+vector<SongResult> radiusNearestNeighbors(const string& songName, int k,
+                                          const vector<song_data>& allSongs,
+                                          const unordered_map<string, vector<pair<string, int>>>& trackArtistMap) {
     vector<SongResult> results;
-    results.push_back(SongResult("Radius Song 1", "Artist X", 0.92f));
-    results.push_back(SongResult("Radius Song 2", "Artist Y", 0.87f));
-    results.push_back(SongResult("Radius Song 3", "Artist Z", 0.81f));
-    results.push_back(SongResult("Radius Song 4", "Artist W", 0.78f));
-    results.push_back(SongResult("Radius Song 5", "Artist V", 0.74f));
+    
+    // try to find the song
+    auto it = trackArtistMap.find(songName);
+    if (it == trackArtistMap.end()) {
+        cout << "Song '" << songName << "' not found in database." << endl;
+        return results;
+    }
+    
+    // get the target song
+    int targetIndex = it->second[0].second;
+    const song_data& targetSong = allSongs[targetIndex];
+    
+    cout << "Found song: " << targetSong.track << " by " << targetSong.artist << endl;
+    
+    // set the radius (this might need tweaking)
+    double radius = 2.0;
+    
+    // find all songs that are close enough
+    vector<pair<double, int>> songsInRadius;
+    
+    for (int i = 0; i < allSongs.size(); i++) {
+        if (i == targetIndex) continue;
+        
+        double dist = calculateDistance(targetSong, allSongs[i]);
+        
+        if (dist <= radius) {
+            songsInRadius.push_back({dist, i});
+        }
+    }
+    
+    // sort by distance
+    sort(songsInRadius.begin(), songsInRadius.end());
+    
+    // take the top k from those that made it into the radius
+    int numResults = min(k, (int)songsInRadius.size());
+    for (int i = 0; i < numResults; i++) {
+        int songIndex = songsInRadius[i].second;
+        double distance = songsInRadius[i].first;
+        
+        // convert distance to similarity score
+        float similarity = 1.0f / (1.0f + distance);
+        
+        results.push_back(SongResult(
+            allSongs[songIndex].track,
+            allSongs[songIndex].artist,
+            similarity
+        ));
+    }
+    
+    cout << "Found " << songsInRadius.size() << " songs within radius " << radius << endl;
+    cout << "Returning top " << results.size() << " matches!" << endl;
     return results;
 }
 
-// main entry point - creates the UI and runs it
 int main() {
     MelodyMapUI app;
     app.run();
