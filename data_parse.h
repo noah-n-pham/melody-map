@@ -1,5 +1,4 @@
 #pragma once
-
 #include <fstream>
 #include <vector>
 #include <iostream>
@@ -7,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 #include <unordered_map>
+#include <filesystem> // need c++ 17
 
 /*
 Container for all relevant song data from a dataset of spotify songs
@@ -26,6 +26,8 @@ struct song_data {
     double instrumentalness; 
     double valence;
     double tempo; // needs to be normalized
+
+    
     
     song_data(std::vector<std::string> d):
         artist(d[2]),
