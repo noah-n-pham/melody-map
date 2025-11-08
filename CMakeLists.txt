@@ -18,6 +18,7 @@ add_executable(melody_map
         gui.cpp
         data_parse.cpp
         rNN.cpp
+        gui.cpp
         )
 
 # adds the dataset to the cwd
