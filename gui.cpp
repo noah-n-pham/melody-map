@@ -505,7 +505,6 @@ public:
             }
             
             window.draw(optionBox);
-            optionText.draw(window);
         }
     }
     
