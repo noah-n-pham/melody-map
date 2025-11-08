@@ -8,17 +8,6 @@
 
 using namespace std;
 
-// this struct holds information about each recommended song
-// it stores the track name, artist, and how similar it is to the search query (0.0 to 1.0)
-struct SongResult {
-    string trackName;
-    string artist;
-    float similarity;
-    
-    SongResult(const string& name, const string& art, float sim)
-        : trackName(name), artist(art), similarity(sim) {}
-};
-
 // variables to store the dataset (loaded once at the start of the program)
 vector<song_data> allSongs;
 unordered_map<string, vector<pair<string, int>>> songLookup;
@@ -40,7 +29,6 @@ double calculateDistance(const song_data& a, const song_data& b) {
 #include "rNN.h" // has the radius nearest neighbors algo
 using namespace std;
 
-// these are placeholder function declarations for the recommendation algorithms
 // khoi will implement the K-Nearest Neighbors algorithm here
 vector<SongResult> kNearestNeighbors(const string& songName, int k){
     // try to find the song that the user searched for in the dataset
@@ -460,10 +448,10 @@ vector<SongResult> radiusNearestNeighbors(const string& songName, int k) {
 }
 
 // main entry point - creates the UI and runs it
-int main() {
+int main(int argc, char* argv[]) {
     // load the dataset before starting the UI so each search is fast and algorithm performance is consistent
     cout << "Loading song database from dataset.csv..." << endl;
-    allSongs = loadData();
+    allSongs = loadData(argv[0]);
     songLookup = getTrack_Artist(allSongs);
     cout << "Successfully loaded " << allSongs.size() << " songs!" << endl;
     
