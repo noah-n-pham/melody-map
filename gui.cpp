@@ -2,6 +2,8 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <cmath>
+#include <algorithm>
 #include "data_parse.h"
 
 using namespace std;
@@ -16,6 +18,10 @@ struct SongResult {
     SongResult(const string& name, const string& art, float sim)
         : trackName(name), artist(art), similarity(sim) {}
 };
+
+// variables to store the dataset (loaded once at the start of the program)
+vector<song_data> allSongs;
+unordered_map<string, vector<pair<string, int>>> songLookup;
 
 // helper function to find euclidean distance between two songs
 double calculateDistance(const song_data& a, const song_data& b) {
@@ -33,6 +39,39 @@ double calculateDistance(const song_data& a, const song_data& b) {
 // these are placeholder function declarations for the recommendation algorithms
 // khoi will implement the K-Nearest Neighbors algorithm here
 vector<SongResult> kNearestNeighbors(const string& songName, int k){
+    // try to find the song that the user searched for in the dataset
+    if (songLookup.find(songName) == songLookup.end()) {
+        return {}; // song not found so return empty results
+    }
+    
+    // get the index of the query song and store its data
+    int queryIndex = songLookup[songName][0].second;
+    song_data querySong = allSongs[queryIndex];
+    
+    // loop through every song and calculate how far it is from the query song
+    vector<pair<double, int>> distances;
+    for (int i = 0; i < allSongs.size(); i++) {
+        // skip the query song itself (including any duplicate entries with same name)
+        if (i == queryIndex || allSongs[i].track == querySong.track) continue;
+        double dist = calculateDistance(querySong, allSongs[i]);
+        distances.push_back(make_pair(dist, i));
+    }
+    
+    // sort all the distances from smallest to largest to find the nearest neighbors
+    sort(distances.begin(), distances.end());
+    
+    // take the k nearest songs and convert them to SongResult format so it is ready to display
+    vector<SongResult> results;
+    for (int i = 0; i < k && i < distances.size(); i++) {
+        float similarity = 1.0 / (1.0 + distances[i].first);
+        results.push_back(SongResult(
+            allSongs[distances[i].second].track,
+            allSongs[distances[i].second].artist,
+            similarity
+        ));
+    }
+    
+    return results;
 }
 
 
@@ -91,7 +130,9 @@ public:
         // font loading
         bool fontLoaded = false;
         vector<string> fontPaths = {
-            "C:/Windows/Fonts/arial.ttf",       // standard Windows Arial location; add multiple fonts here in case u wanan swap em
+            "/System/Library/Fonts/Supplemental/Arial.ttf",  // macOS Arial
+            "/System/Library/Fonts/Helvetica.ttc",           // macOS Helvetica fallback
+            "C:/Windows/Fonts/arial.ttf",                    // Windows Arial
         };
         
         for (const auto& path : fontPaths) {
@@ -122,7 +163,7 @@ public:
         //set up the main title at the top - "Melody Map"
         titleText.setString("Melody Map");
         titleText.setCharacterSize(48u);
-        titleText.setFillColor(sf::Color(30u, 215u, 96u)); // Spotify green - looks modern!
+        titleText.setFillColor(sf::Color(30u, 215u, 96u)); // Spotify green
         titleText.setPosition({static_cast<float>(WINDOW_WIDTH) / 2.f - 150.f, 30.f});
         
         // label that says "Enter Song Name:"
@@ -416,6 +457,13 @@ vector<SongResult> radiusNearestNeighbors(const string& songName, int k) {
 
 // main entry point - creates the UI and runs it
 int main() {
+    // load the dataset before starting the UI so each search is fast and algorithm performance is consistent
+    cout << "Loading song database from dataset.csv..." << endl;
+    allSongs = loadData();
+    songLookup = getTrack_Artist(allSongs);
+    cout << "Successfully loaded " << allSongs.size() << " songs!" << endl;
+    
+    // now start the UI
     MelodyMapUI app;
     app.run();
     return 0;
