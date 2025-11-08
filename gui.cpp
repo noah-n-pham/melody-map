@@ -485,6 +485,7 @@ public:
             }
             
             window.draw(optionBox);
+            window.draw(optionText);
         }
     }
     
