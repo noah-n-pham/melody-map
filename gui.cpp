@@ -5,7 +5,7 @@
 #include <cmath>
 #include <algorithm>
 #include "data_parse.h"
-
+#include "rNN.h"
 using namespace std;
 
 // helper function to find euclidean distance between two songs
@@ -47,26 +47,18 @@ int findSongIndex(const string& songName, const string& artistName,
     return it->second[0].second;
 }
 
-
 // khoi will implement the K-Nearest Neighbors algorithm here
-vector<SongResult> kNearestNeighbors(const string& songName, const string& artistName, int k,
-                                     const vector<song_data>& allSongs,
-                                     const unordered_map<string, vector<pair<string, int>>>& trackArtistMap){
-    // find the song index using helper function
-    int queryIndex = findSongIndex(songName, artistName, trackArtistMap);
-    if (queryIndex == -1) {
-        cout << "Song '" << songName << "' not found in database." << endl;
-        return {}; // song not found so return empty results
-    }
-    
-    song_data querySong = allSongs[queryIndex];
+vector<SongResult> kNearestNeighbors(int k, int index,
+                                     const vector<song_data>& allSongs
+                                    ){
+    song_data querySong = allSongs[index];
     cout << "Found song: " << querySong.track << " by " << querySong.artist << endl;
     
     // loop through every song and calculate how far it is from the query song
     vector<pair<double, int>> distances;
     for (int i = 0; i < allSongs.size(); i++) {
         // skip the query song itself (including any duplicate entries with same name)
-        if (i == queryIndex || allSongs[i].track == querySong.track) continue;
+        if (i == index || allSongs[i].track == querySong.track) continue;
         double dist = calculateDistance(querySong, allSongs[i]);
         distances.push_back(make_pair(dist, i));
     }
@@ -124,8 +116,8 @@ private:
     
     // state variables
     string userInput;
-    string selectedSongName;      // NEW: stores selected song name
-    string selectedArtistName;    // NEW: stores selected artist name
+    string selectedSongName;      
+    string selectedArtistName;    
     string selectedAlgorithm;
     bool dropdownOpen;
     bool isSearching;
@@ -133,7 +125,8 @@ private:
     vector<SongResult> results;
     sf::Clock cursorClock;
     bool showCursor;
-    
+    pair<string, string> searchResults;
+
     // autocomplete state
     bool showSuggestions;
     vector<pair<string, string>> currentSuggestions;
@@ -146,18 +139,7 @@ private:
     // used to prevent double-clicking on suggestions
     sf::Clock clickClock;
     const float CLICK_DELAY = 0.15f;
-    
-    // NEW: helper function to parse "Song - Artist" format
-    pair<string, string> parseSongArtist(const string& input) {
-        size_t dashPos = input.find(" - ");
-        if (dashPos != string::npos) {
-            string song = input.substr(0, dashPos);
-            string artist = input.substr(dashPos + 3);
-            return {song, artist};
-        }
-        // if no " - " found, assume it's just the song name
-        return {input, ""};
-    }
+
     
 public:
     MelodyMapUI(const string& exePath) : 
@@ -314,6 +296,7 @@ public:
             selectedSongName = currentSuggestions[index].first;
             selectedArtistName = currentSuggestions[index].second;
             userInput = selectedSongName + " - " + selectedArtistName;
+            searchResults = make_pair(currentSuggestions[index].first, currentSuggestions[index].second);
             inputText.setString(userInput);
             showSuggestions = false;
             selectedSuggestionIndex = -1;
@@ -336,7 +319,7 @@ public:
                 if (showSuggestions && selectedSuggestionIndex >= 0) {
                     selectSuggestion(selectedSuggestionIndex);
                 } else if (!userInput.empty()) {
-                    performSearch();
+                    performSearch(trackArtistMap);
                 }
             } else if (textEvent.unicode >= 32 && textEvent.unicode < 128) {
                 // regular character like a letter or number
@@ -390,7 +373,7 @@ public:
             
             // did they click the search button?
             if (searchButton.getGlobalBounds().contains(mousePos) && !userInput.empty()) {
-                performSearch();
+                performSearch(trackArtistMap);
                 clickedAnywhere = true;
             }
             
@@ -417,24 +400,21 @@ public:
     }
     
     // run the search algorithm
-    void performSearch() {
+    void performSearch(const unordered_map<string, vector<pair<string, int>>>& trackArtistMap) {
         isSearching = true;
         results.clear();
         showSuggestions = false;
         
-        // UPDATED: Parse the input to get song name and artist
-        auto [songName, artistName] = parseSongArtist(userInput);
-        
-        // If user selected from autocomplete, use those stored values
-        if (!selectedSongName.empty()) {
-            songName = selectedSongName;
-            artistName = selectedArtistName;
-        }
+        int queryIndex = findSongIndex(searchResults.first, searchResults.second, trackArtistMap);
+        if (queryIndex == -1) {
+        cout << "Song not found in database." << endl;
+        return;
+        }    
         
         if (selectedAlgorithm == "K-Nearest Neighbors") {
-            results = kNearestNeighbors(songName, artistName, 10, allSongs, trackArtistMap);
+            results = kNearestNeighbors(queryIndex, 10, allSongs);
         } else {
-            results = radiusNearestNeighbors(songName, artistName, 10, allSongs, trackArtistMap);
+            results = rNN(allSongs,allSongs[queryIndex],0.105);
         }
         
         updateResultsDisplay();
@@ -633,63 +613,6 @@ public:
         }
     }
 };
-
-// marcelo's radius nearest neighbors implementation
-// finds all songs within a certain distance, then returns the top k
-vector<SongResult> radiusNearestNeighbors(const string& songName, const string& artistName, int k,
-                                          const vector<song_data>& allSongs,
-                                          const unordered_map<string, vector<pair<string, int>>>& trackArtistMap) {
-    vector<SongResult> results;
-    
-    // find the song index using helper function
-    int targetIndex = findSongIndex(songName, artistName, trackArtistMap);
-    if (targetIndex == -1) {
-        cout << "Song '" << songName << "' not found in database." << endl;
-        return results;
-    }
-    
-    const song_data& targetSong = allSongs[targetIndex];
-    cout << "Found song: " << targetSong.track << " by " << targetSong.artist << endl;
-    
-    // set the radius (this might need tweaking)
-    double radius = 2.0;
-    
-    // find all songs that are close enough
-    vector<pair<double, int>> songsInRadius;
-    
-    for (int i = 0; i < allSongs.size(); i++) {
-        if (i == targetIndex) continue;
-        
-        double dist = calculateDistance(targetSong, allSongs[i]);
-        
-        if (dist <= radius) {
-            songsInRadius.push_back({dist, i});
-        }
-    }
-    
-    // sort by distance
-    sort(songsInRadius.begin(), songsInRadius.end());
-    
-    // take the top k from those that made it into the radius
-    int numResults = min(k, (int)songsInRadius.size());
-    for (int i = 0; i < numResults; i++) {
-        int songIndex = songsInRadius[i].second;
-        double distance = songsInRadius[i].first;
-        
-        // convert distance to similarity score
-        float similarity = 1.0f / (1.0f + distance);
-        
-        results.push_back(SongResult(
-            allSongs[songIndex].track,
-            allSongs[songIndex].artist,
-            similarity
-        ));
-    }
-    
-    cout << "Found " << songsInRadius.size() << " songs within radius " << radius << endl;
-    cout << "Returning top " << results.size() << " matches!" << endl;
-    return results;
-}
 
 // main entry point - creates the UI and runs it
 int main(int argc, char* argv[]) {
