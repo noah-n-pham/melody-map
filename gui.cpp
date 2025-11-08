@@ -36,6 +36,10 @@ double calculateDistance(const song_data& a, const song_data& b) {
     return sqrt(sum);
 }
 
+#include "data_parse.h"
+#include "rNN.h" // has the radius nearest neighbors algo
+using namespace std;
+
 // these are placeholder function declarations for the recommendation algorithms
 // khoi will implement the K-Nearest Neighbors algorithm here
 vector<SongResult> kNearestNeighbors(const string& songName, int k){

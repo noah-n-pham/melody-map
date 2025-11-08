@@ -1,6 +1,7 @@
 #include "data_parse.h"
 
-// helper to associate names of songs artists with their artists and index in the larger vector for lookup by name
+
+
 std::unordered_map<std::string,std::vector<std::pair<std::string,int>>> getTrack_Artist(const std::vector<song_data>& d){
     std::unordered_map<std::string,std::vector<std::pair<std::string,int>>> ret;
     ret.reserve(d.size());
@@ -10,7 +11,7 @@ std::unordered_map<std::string,std::vector<std::pair<std::string,int>>> getTrack
     return ret;
 }
 
-// this is necessary to correctly parse through elements in csv with , in them (which are enclosed in "")
+
 std::vector<std::string> parseRow(const std::string& line){
     // there will always be 21 elements max in vector so reserve in advance
     std::vector<std::string> data;
@@ -64,8 +65,14 @@ void normalize(std::vector<song_data>& songs){
     }
 }
 
-std::vector<song_data> loadData(){
-    std::ifstream dataset("./dataset.csv");
+std::vector<song_data> loadData(std::string exePath){
+    // the following 3 lines find the dataset path across systems
+    // this is necessary for the file to be properly opened
+    std::filesystem::path exPath(exePath);
+    std::filesystem::path Pdirectory = exPath.parent_path();
+    std::filesystem::path datasetPath = Pdirectory/"dataset.csv";
+
+    std::ifstream dataset(datasetPath.string());
     if (!dataset.is_open()){
         throw std::runtime_error("Failed to open file");
     }
