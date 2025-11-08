@@ -4,17 +4,18 @@
 #include <string>
 #include <unordered_map>
 #include <algorithm>
+#include <sstream>
 #include "data_parse.h"
 
 using namespace std;
 
 // khoi will implement the k-nearest neighbors algorithm
-vector<SongResult> kNearestNeighbors(const string& songName, int k, 
+vector<SongResult> kNearestNeighbors(const string& songName, const string& artistName, int k, 
                                      const vector<song_data>& allSongs,
                                      const unordered_map<string, vector<pair<string, int>>>& trackArtistMap);
 
 // marcelo will implement the radius nearest neighbors algorithm
-vector<SongResult> radiusNearestNeighbors(const string& songName, int k,
+vector<SongResult> radiusNearestNeighbors(const string& songName, const string& artistName, int k,
                                           const vector<song_data>& allSongs,
                                           const unordered_map<string, vector<pair<string, int>>>& trackArtistMap);
 
@@ -48,6 +49,8 @@ private:
     
     // state variables
     string userInput;
+    string selectedSongName;
+    string selectedArtistName;
     string selectedAlgorithm;
     bool dropdownOpen;
     bool isSearching;
@@ -68,6 +71,18 @@ private:
     // used to prevent double-clicking on suggestions
     sf::Clock clickClock;
     const float CLICK_DELAY = 0.15f;
+    
+    // helper function to parse "Song - Artist" format
+    pair<string, string> parseSongArtist(const string& input) {
+        size_t dashPos = input.find(" - ");
+        if (dashPos != string::npos) {
+            string song = input.substr(0, dashPos);
+            string artist = input.substr(dashPos + 3);
+            return {song, artist};
+        }
+        // if no " - " found, assume it's just the song name
+        return {input, ""};
+    }
     
 public:
     MelodyMapUI() : 
@@ -204,7 +219,12 @@ public:
             
             // if the song name has what we typed in it, add it to suggestions
             if (lowerTrack.find(lowerInput) != string::npos) {
-                currentSuggestions.push_back({trackName, artistList[0].first});
+                // Add all versions of the song (different artists)
+                for (const auto& artistPair : artistList) {
+                    currentSuggestions.push_back({trackName, artistPair.first});
+                    
+                    if (currentSuggestions.size() >= MAX_SUGGESTIONS) break;
+                }
                 
                 if (currentSuggestions.size() >= MAX_SUGGESTIONS) break;
             }
@@ -213,10 +233,12 @@ public:
         showSuggestions = !currentSuggestions.empty();
     }
     
-    // when someone picks a suggestion, fill it into the search box
+    // when someone picks a suggestion, fill it into the search box with "Song - Artist" format
     void selectSuggestion(int index) {
         if (index >= 0 && index < currentSuggestions.size()) {
-            userInput = currentSuggestions[index].first;
+            selectedSongName = currentSuggestions[index].first;
+            selectedArtistName = currentSuggestions[index].second;
+            userInput = selectedSongName + " - " + selectedArtistName;
             inputText.setString(userInput);
             showSuggestions = false;
             selectedSuggestionIndex = -1;
@@ -325,14 +347,27 @@ public:
         results.clear();
         showSuggestions = false;
         
+        // Parse the input to get song name and artist
+        auto [songName, artistName] = parseSongArtist(userInput);
+        
+        // If user selected from autocomplete, use those stored values
+        if (!selectedSongName.empty()) {
+            songName = selectedSongName;
+            artistName = selectedArtistName;
+        }
+        
         if (selectedAlgorithm == "K-Nearest Neighbors") {
-            results = kNearestNeighbors(userInput, 10, allSongs, trackArtistMap);
+            results = kNearestNeighbors(songName, artistName, 10, allSongs, trackArtistMap);
         } else {
-            results = radiusNearestNeighbors(userInput, 10, allSongs, trackArtistMap);
+            results = radiusNearestNeighbors(songName, artistName, 10, allSongs, trackArtistMap);
         }
         
         updateResultsDisplay();
         isSearching = false;
+        
+        // Clear the selected song/artist for next search
+        selectedSongName.clear();
+        selectedArtistName.clear();
     }
     
     // format the search results so they look nice
@@ -538,9 +573,8 @@ double calculateDistance(const song_data& song1, const song_data& song2) {
     );
 }
 
-// khoi's k-nearest neighbors implementation
-// finds the k closest songs to the one you searched for
-vector<SongResult> kNearestNeighbors(const string& songName, int k,
+// khoi's k-nearest neighbors implementation - NOW WITH ARTIST SUPPORT!
+vector<SongResult> kNearestNeighbors(const string& songName, const string& artistName, int k,
                                      const vector<song_data>& allSongs,
                                      const unordered_map<string, vector<pair<string, int>>>& trackArtistMap) {
     vector<SongResult> results;
@@ -552,10 +586,28 @@ vector<SongResult> kNearestNeighbors(const string& songName, int k,
         return results;
     }
     
-    // get the song they searched for
-    int targetIndex = it->second[0].second;
-    const song_data& targetSong = allSongs[targetIndex];
+    // Find the right version by matching the artist
+    int targetIndex = -1;
+    if (!artistName.empty()) {
+        // Search for exact artist match
+        for (const auto& artistPair : it->second) {
+            if (artistPair.first == artistName) {
+                targetIndex = artistPair.second;
+                break;
+            }
+        }
+    }
     
+    // If no artist specified or no match found, use first version
+    if (targetIndex == -1) {
+        targetIndex = it->second[0].second;
+        if (!artistName.empty()) {
+            cout << "Artist '" << artistName << "' not found for song '" << songName 
+                 << "', using first match instead." << endl;
+        }
+    }
+    
+    const song_data& targetSong = allSongs[targetIndex];
     cout << "Found song: " << targetSong.track << " by " << targetSong.artist << endl;
     
     // calculate how far away every other song is
@@ -591,9 +643,8 @@ vector<SongResult> kNearestNeighbors(const string& songName, int k,
     return results;
 }
 
-// marcelo's radius nearest neighbors implementation
-// finds all songs within a certain distance, then returns the top k
-vector<SongResult> radiusNearestNeighbors(const string& songName, int k,
+// marcelo's radius nearest neighbors implementation - NOW WITH ARTIST SUPPORT!
+vector<SongResult> radiusNearestNeighbors(const string& songName, const string& artistName, int k,
                                           const vector<song_data>& allSongs,
                                           const unordered_map<string, vector<pair<string, int>>>& trackArtistMap) {
     vector<SongResult> results;
@@ -605,10 +656,28 @@ vector<SongResult> radiusNearestNeighbors(const string& songName, int k,
         return results;
     }
     
-    // get the target song
-    int targetIndex = it->second[0].second;
-    const song_data& targetSong = allSongs[targetIndex];
+    // Find the right version by matching the artist
+    int targetIndex = -1;
+    if (!artistName.empty()) {
+        // Search for exact artist match
+        for (const auto& artistPair : it->second) {
+            if (artistPair.first == artistName) {
+                targetIndex = artistPair.second;
+                break;
+            }
+        }
+    }
     
+    // If no artist specified or no match found, use first version
+    if (targetIndex == -1) {
+        targetIndex = it->second[0].second;
+        if (!artistName.empty()) {
+            cout << "Artist '" << artistName << "' not found for song '" << songName 
+                 << "', using first match instead." << endl;
+        }
+    }
+    
+    const song_data& targetSong = allSongs[targetIndex];
     cout << "Found song: " << targetSong.track << " by " << targetSong.artist << endl;
     
     // set the radius (this might need tweaking)
