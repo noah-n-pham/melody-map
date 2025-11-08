@@ -2,16 +2,67 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <unordered_map>
+#include <cmath>
 #include <algorithm>
 #include "data_parse.h"
 
 using namespace std;
 
-// khoi will implement the k-nearest neighbors algorithm
-vector<SongResult> kNearestNeighbors(const string& songName, int k, 
-                                     const vector<song_data>& allSongs,
-                                     const unordered_map<string, vector<pair<string, int>>>& trackArtistMap);
+// variables to store the dataset (loaded once at the start of the program)
+vector<song_data> allSongs;
+unordered_map<string, vector<pair<string, int>>> songLookup;
+
+// helper function to find euclidean distance between two songs
+double calculateDistance(const song_data& a, const song_data& b) {
+    double sum = 0.0;
+    sum += (a.duration - b.duration) * (a.duration - b.duration);
+    sum += (a.energy - b.energy) * (a.energy - b.energy);
+    sum += (a.speechiness - b.speechiness) * (a.speechiness - b.speechiness);
+    sum += (a.acousticness - b.acousticness) * (a.acousticness - b.acousticness);
+    sum += (a.instrumentalness - b.instrumentalness) * (a.instrumentalness - b.instrumentalness);
+    sum += (a.valence - b.valence) * (a.valence - b.valence);
+    sum += (a.tempo - b.tempo) * (a.tempo - b.tempo);
+    return sqrt(sum);
+}
+
+
+// khoi will implement the K-Nearest Neighbors algorithm here
+vector<SongResult> kNearestNeighbors(const string& songName, int k){
+    // try to find the song that the user searched for in the dataset
+    if (songLookup.find(songName) == songLookup.end()) {
+        return {}; // song not found so return empty results
+    }
+    
+    // get the index of the query song and store its data
+    int queryIndex = songLookup[songName][0].second;
+    song_data querySong = allSongs[queryIndex];
+    
+    // loop through every song and calculate how far it is from the query song
+    vector<pair<double, int>> distances;
+    for (int i = 0; i < allSongs.size(); i++) {
+        // skip the query song itself (including any duplicate entries with same name)
+        if (i == queryIndex || allSongs[i].track == querySong.track) continue;
+        double dist = calculateDistance(querySong, allSongs[i]);
+        distances.push_back(make_pair(dist, i));
+    }
+    
+    // sort all the distances from smallest to largest to find the nearest neighbors
+    sort(distances.begin(), distances.end());
+    
+    // take the k nearest songs and convert them to SongResult format so it is ready to display
+    vector<SongResult> results;
+    for (int i = 0; i < k && i < distances.size(); i++) {
+        float similarity = 1.0 / (1.0 + distances[i].first);
+        results.push_back(SongResult(
+            allSongs[distances[i].second].track,
+            allSongs[distances[i].second].artist,
+            similarity
+        ));
+    }
+    
+    return results;
+}
+
 
 // marcelo will implement the radius nearest neighbors algorithm
 vector<SongResult> radiusNearestNeighbors(const string& songName, int k,
@@ -94,10 +145,9 @@ public:
         // try to find a font that works
         bool fontLoaded = false;
         vector<string> fontPaths = {
-            "arial.ttf",
-            "C:/Windows/Fonts/arial.ttf",
-            "C:/Windows/Fonts/segoeui.ttf",
-            "C:/Windows/Fonts/calibri.ttf"
+            "/System/Library/Fonts/Supplemental/Arial.ttf",  // macOS Arial
+            "/System/Library/Fonts/Helvetica.ttc",           // macOS Helvetica fallback
+            "C:/Windows/Fonts/arial.ttf",                    // Windows Arial
         };
         
         for (const auto& path : fontPaths) {
@@ -538,58 +588,19 @@ double calculateDistance(const song_data& song1, const song_data& song2) {
     );
 }
 
-// khoi's k-nearest neighbors implementation
-// finds the k closest songs to the one you searched for
-vector<SongResult> kNearestNeighbors(const string& songName, int k,
-                                     const vector<song_data>& allSongs,
-                                     const unordered_map<string, vector<pair<string, int>>>& trackArtistMap) {
-    vector<SongResult> results;
-    
-    // try to find the song in our database
-    auto it = trackArtistMap.find(songName);
-    if (it == trackArtistMap.end()) {
-        cout << "Song '" << songName << "' not found in database." << endl;
-        return results;
-    }
-    
-    // get the song they searched for
-    int targetIndex = it->second[0].second;
-    const song_data& targetSong = allSongs[targetIndex];
-    
-    cout << "Found song: " << targetSong.track << " by " << targetSong.artist << endl;
-    
-    // calculate how far away every other song is
-    vector<pair<double, int>> distances;
-    distances.reserve(allSongs.size());
-    
-    for (int i = 0; i < allSongs.size(); i++) {
-        if (i == targetIndex) continue;
-        
-        double dist = calculateDistance(targetSong, allSongs[i]);
-        distances.push_back({dist, i});
-    }
-    
-    // sort so the closest songs are first
-    sort(distances.begin(), distances.end());
-    
-    // grab the k closest songs
-    for (int i = 0; i < min(k, (int)distances.size()); i++) {
-        int songIndex = distances[i].second;
-        double distance = distances[i].first;
-        
-        // turn distance into a percentage (closer = higher percentage)
-        float similarity = 1.0f / (1.0f + distance);
-        
-        results.push_back(SongResult(
-            allSongs[songIndex].track,
-            allSongs[songIndex].artist,
-            similarity
-        ));
-    }
-    
-    cout << "Found " << results.size() << " similar songs using K-NN!" << endl;
-    return results;
-}
+// Khoi's K-Nearest Neighbors algorithm
+// This should load the Spotify dataset, calculate distances, and return the k closest songs
+// vector<SongResult> kNearestNeighbors(const string& songName, int k) {
+//     // TODO: Khoi - Replace this with your actual K-NN implementation
+//     // For now, just returning some dummy data so we can test the UI
+//     vector<SongResult> results;
+//     results.push_back(SongResult("Similar Song 1", "Artist A", 0.95f));
+//     results.push_back(SongResult("Similar Song 2", "Artist B", 0.89f));
+//     results.push_back(SongResult("Similar Song 3", "Artist C", 0.84f));
+//     results.push_back(SongResult("Similar Song 4", "Artist D", 0.80f));
+//     results.push_back(SongResult("Similar Song 5", "Artist E", 0.76f));
+//     return results;
+// }
 
 // marcelo's radius nearest neighbors implementation
 // finds all songs within a certain distance, then returns the top k
@@ -651,7 +662,15 @@ vector<SongResult> radiusNearestNeighbors(const string& songName, int k,
     return results;
 }
 
-int main() {
+// main entry point - creates the UI and runs it
+int main(int argc, char* argv[]) {
+    // load the dataset before starting the UI so each search is fast and algorithm performance is consistent
+    cout << "Loading song database from dataset.csv..." << endl;
+    allSongs = loadData(argv[0]);
+    songLookup = getTrack_Artist(allSongs);
+    cout << "Successfully loaded " << allSongs.size() << " songs!" << endl;
+    
+    // now start the UI
     MelodyMapUI app;
     app.run();
     return 0;
