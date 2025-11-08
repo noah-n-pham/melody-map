@@ -31,30 +31,42 @@ double getPercentSim(double distance){
 vector<SongResult> rNN(const std::vector<song_data>& allSongs, const song_data& search, double r){
     const double rSquare = r*r;
     vector<SongResult> results;
+    unordered_map<double,string> dupes;
     for ( auto& song : allSongs){
 
-        // skip duplicates
+        // skip same track as search
         if (song.track == search.track && song.artist == search.artist){
             continue;
         }
         double diffDisSquare = songDistanceSquare(song,search);
         if (diffDisSquare < rSquare){
-
-            results.emplace_back(song.track,song.artist,getPercentSim(sqrt(diffDisSquare)));
+            auto check = dupes.find(diffDisSquare);
+            if (check != dupes.end() && check->second == song.artist){ // skip duplicate results
+                continue;
+            }
+            else {
+                results.emplace_back(song.track,song.artist,getPercentSim(sqrt(diffDisSquare)));
+                dupes[diffDisSquare] = song.artist;
+            }
         }
     }
     
     // could be removed if we don't want the results in sorted order by similarity
-    sort(results.begin(),results.end(),[](const SongResult& s1, const SongResult& s2){return s1.similarity > s2.similarity;});
+    std::sort(results.begin(),results.end(),[](const SongResult& s1, const SongResult& s2){return s1.similarity > s2.similarity;});
     return results;
 }
 
 /* DEBUG ONLY
-int main(int argc,char* argv[]){
+int main(int argc, char* argv[]){
     auto vec = loadData(argv[0]);
-    cout << vec.size() << endl;
-    auto results = rNN(vec,vec[67580],0.10);
-    cout << results.size();
+    vec[10001].Print();
+    auto results = rNN(vec,vec[101],0.105);
+    cout << "Size of Results: " << results.size() << endl;
+    for (int i = 0; i < 10; i++){
+       cout << "Song: " << results[i].trackName 
+            << " Artist: " << results[i].artist
+            << " Similarity: " << results[i].similarity << endl;
+    }
     return 0;
 }
 */
