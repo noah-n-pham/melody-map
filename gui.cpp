@@ -8,10 +8,6 @@
 
 using namespace std;
 
-// variables to store the dataset (loaded once at the start of the program)
-vector<song_data> allSongs;
-unordered_map<string, vector<pair<string, int>>> songLookup;
-
 // helper function to find euclidean distance between two songs
 double calculateDistance(const song_data& a, const song_data& b) {
     double sum = 0.0;
@@ -27,14 +23,16 @@ double calculateDistance(const song_data& a, const song_data& b) {
 
 
 // khoi will implement the K-Nearest Neighbors algorithm here
-vector<SongResult> kNearestNeighbors(const string& songName, int k){
+vector<SongResult> kNearestNeighbors(const string& songName, int k,
+                                     const vector<song_data>& allSongs,
+                                     const unordered_map<string, vector<pair<string, int>>>& trackArtistMap){
     // try to find the song that the user searched for in the dataset
-    if (songLookup.find(songName) == songLookup.end()) {
+    if (trackArtistMap.find(songName) == trackArtistMap.end()) {
         return {}; // song not found so return empty results
     }
     
     // get the index of the query song and store its data
-    int queryIndex = songLookup[songName][0].second;
+    int queryIndex = trackArtistMap.at(songName)[0].second;
     song_data querySong = allSongs[queryIndex];
     
     // loop through every song and calculate how far it is from the query song
@@ -121,7 +119,7 @@ private:
     const float CLICK_DELAY = 0.15f;
     
 public:
-    MelodyMapUI() : 
+    MelodyMapUI(const string& exePath) : 
         titleText(font),
         searchLabel(font),
         inputText(font),
@@ -135,7 +133,7 @@ public:
         // load all the songs from the csv
         cout << "Loading Spotify dataset..." << endl;
         try {
-            allSongs = loadData("dataset.csv");
+            allSongs = loadData(exePath);
             trackArtistMap = getTrack_Artist(allSongs);
             cout << "Successfully loaded " << allSongs.size() << " songs!" << endl;
         } catch (const exception& e) {
@@ -575,33 +573,6 @@ public:
     }
 };
 
-// helper to calculate distance between two songs based on their features
-double calculateDistance(const song_data& song1, const song_data& song2) {
-    return sqrt(
-        pow(song1.duration - song2.duration, 2) +
-        pow(song1.energy - song2.energy, 2) +
-        pow(song1.speechiness - song2.speechiness, 2) +
-        pow(song1.acousticness - song2.acousticness, 2) +
-        pow(song1.instrumentalness - song2.instrumentalness, 2) +
-        pow(song1.valence - song2.valence, 2) +
-        pow(song1.tempo - song2.tempo, 2)
-    );
-}
-
-// Khoi's K-Nearest Neighbors algorithm
-// This should load the Spotify dataset, calculate distances, and return the k closest songs
-// vector<SongResult> kNearestNeighbors(const string& songName, int k) {
-//     // TODO: Khoi - Replace this with your actual K-NN implementation
-//     // For now, just returning some dummy data so we can test the UI
-//     vector<SongResult> results;
-//     results.push_back(SongResult("Similar Song 1", "Artist A", 0.95f));
-//     results.push_back(SongResult("Similar Song 2", "Artist B", 0.89f));
-//     results.push_back(SongResult("Similar Song 3", "Artist C", 0.84f));
-//     results.push_back(SongResult("Similar Song 4", "Artist D", 0.80f));
-//     results.push_back(SongResult("Similar Song 5", "Artist E", 0.76f));
-//     return results;
-// }
-
 // marcelo's radius nearest neighbors implementation
 // finds all songs within a certain distance, then returns the top k
 vector<SongResult> radiusNearestNeighbors(const string& songName, int k,
@@ -664,14 +635,8 @@ vector<SongResult> radiusNearestNeighbors(const string& songName, int k,
 
 // main entry point - creates the UI and runs it
 int main(int argc, char* argv[]) {
-    // load the dataset before starting the UI so each search is fast and algorithm performance is consistent
-    cout << "Loading song database from dataset.csv..." << endl;
-    allSongs = loadData(argv[0]);
-    songLookup = getTrack_Artist(allSongs);
-    cout << "Successfully loaded " << allSongs.size() << " songs!" << endl;
-    
-    // now start the UI
-    MelodyMapUI app;
+    // create and run the UI (data loading happens in the constructor)
+    MelodyMapUI app(argv[0]);
     app.run();
     return 0;
 }
