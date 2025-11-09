@@ -31,23 +31,24 @@ double getPercentSim(double distance){
 vector<SongResult> rNN(const std::vector<song_data>& allSongs, const song_data& search, double r){
     const double rSquare = r*r;
     vector<SongResult> results;
-    unordered_map<double,string> dupes;
+    unordered_set<string> seenSongs;  // track song names we've already added
+    
     for ( auto& song : allSongs){
 
         // skip same track as search
         if (song.track == search.track && song.artist == search.artist){
             continue;
         }
+        
+        // skip if we've already added this song name to results
+        if (seenSongs.find(song.track) != seenSongs.end()){
+            continue;
+        }
+        
         double diffDisSquare = songDistanceSquare(song,search);
         if (diffDisSquare < rSquare){
-            auto check = dupes.find(diffDisSquare);
-            if (check != dupes.end() && check->second == song.artist){ // skip duplicate results
-                continue;
-            }
-            else {
-                results.emplace_back(song.track,song.artist,getPercentSim(sqrt(diffDisSquare)));
-                dupes[diffDisSquare] = song.artist;
-            }
+            results.emplace_back(song.track,song.artist,getPercentSim(sqrt(diffDisSquare)));
+            seenSongs.insert(song.track);  // mark this song name as seen
         }
     }
     
