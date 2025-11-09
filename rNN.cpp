@@ -31,7 +31,8 @@ double getPercentSim(double distance){
 vector<SongResult> rNN(const std::vector<song_data>& allSongs, const song_data& search, double r){
     const double rSquare = r*r;
     vector<SongResult> results;
-    unordered_map<double,string> dupes;
+    unordered_map<double,pair<string,string>> dupes;
+    unordered_set<string> dupeNames;
     for ( auto& song : allSongs){
 
         // skip same track as search
@@ -41,12 +42,14 @@ vector<SongResult> rNN(const std::vector<song_data>& allSongs, const song_data& 
         double diffDisSquare = songDistanceSquare(song,search);
         if (diffDisSquare < rSquare){
             auto check = dupes.find(diffDisSquare);
-            if (check != dupes.end() && check->second == song.artist){ // skip duplicate results
+            auto nameCheck = dupeNames.find(song.track);
+            if (check != dupes.end() && check->second == make_pair(song.track,song.artist) || nameCheck != dupeNames.end()){ // skip duplicate results
                 continue;
             }
             else {
                 results.emplace_back(song.track,song.artist,getPercentSim(sqrt(diffDisSquare)));
-                dupes[diffDisSquare] = song.artist;
+                dupes[diffDisSquare] = make_pair(song.track,song.artist);
+                dupeNames.insert(song.track);
             }
         }
     }
@@ -59,6 +62,7 @@ vector<SongResult> rNN(const std::vector<song_data>& allSongs, const song_data& 
     }
     else {
         for (int i = 0; i < 10; i++){
+            cout << results[i].similarity;
             toRe.push_back(results[i]);
         }
     }
