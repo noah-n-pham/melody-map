@@ -39,6 +39,12 @@ vector<SongResult> rNN(const std::vector<song_data>& allSongs, const song_data& 
         if (song.track == search.track && song.artist == search.artist){
             continue;
         }
+        
+        // skip if we've already added this song name to results
+        if (seenSongs.find(song.track) != seenSongs.end()){
+            continue;
+        }
+        
         double diffDisSquare = songDistanceSquare(song,search);
         if (diffDisSquare < rSquare){
             auto check = dupes.find(diffDisSquare);

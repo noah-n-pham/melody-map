@@ -4,6 +4,7 @@
 #include <string>
 #include <cmath>
 #include <algorithm>
+#include <unordered_set>
 #include "data_parse.h"
 #include "rNN.h"
 using namespace std;
@@ -67,14 +68,23 @@ vector<SongResult> kNearestNeighbors(int k, int index,
     sort(distances.begin(), distances.end());
     
     // take the k nearest songs and convert them to SongResult format so it is ready to display
+    // use a set to track which song names we've already added to avoid duplicates
+    unordered_set<string> seenSongs;
     vector<SongResult> results;
-    for (int i = 0; i < k && i < distances.size(); i++) {
-        float similarity = 1.0 / (1.0 + distances[i].first);
-        results.push_back(SongResult(
-            allSongs[distances[i].second].track,
-            allSongs[distances[i].second].artist,
-            similarity
-        ));
+    
+    for (int i = 0; i < distances.size() && results.size() < k; i++) {
+        string trackName = allSongs[distances[i].second].track;
+        
+        // only add this song if we haven't seen this track name before
+        if (seenSongs.find(trackName) == seenSongs.end()) {
+            seenSongs.insert(trackName);
+            float similarity = 1.0 / (1.0 + distances[i].first);
+            results.push_back(SongResult(
+                trackName,
+                allSongs[distances[i].second].artist,
+                similarity
+            ));
+        }
     }
     
     return results;
