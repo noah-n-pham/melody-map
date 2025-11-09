@@ -26,7 +26,7 @@ double getPercentSim(double distance){
     but min is 0 so we get value/max as the normalized num
     */
     double normalizedD = distance/MAX_DIST;
-    return (1-normalizedD) * 100; // as a percentage
+    return (1-normalizedD); // as a percentage
 }
 vector<SongResult> rNN(const std::vector<song_data>& allSongs, const song_data& search, double r){
     const double rSquare = r*r;
@@ -53,7 +53,16 @@ vector<SongResult> rNN(const std::vector<song_data>& allSongs, const song_data& 
     
     // could be removed if we don't want the results in sorted order by similarity
     std::sort(results.begin(),results.end(),[](const SongResult& s1, const SongResult& s2){return s1.similarity > s2.similarity;});
-    return results;
+    vector<SongResult> toRe;
+    if (results.size() < 10){
+        cout << "Less than 10 matches found";
+    }
+    else {
+        for (int i = 0; i < 10; i++){
+            toRe.push_back(results[i]);
+        }
+    }
+    return toRe;
 }
 
 /* DEBUG ONLY
