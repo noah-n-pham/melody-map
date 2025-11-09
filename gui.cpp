@@ -424,7 +424,7 @@ public:
         if (selectedAlgorithm == "K-Nearest Neighbors") {
             results = kNearestNeighbors(10,queryIndex, allSongs);
         } else {
-            results = rNN(allSongs,allSongs[queryIndex],0.200);
+            results = rNN(allSongs,allSongs[queryIndex],0.220);
         }
         
         updateResultsDisplay();
