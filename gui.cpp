@@ -412,9 +412,9 @@ public:
         }    
         
         if (selectedAlgorithm == "K-Nearest Neighbors") {
-            results = kNearestNeighbors(queryIndex, 10, allSongs);
+            results = kNearestNeighbors(10,queryIndex, allSongs);
         } else {
-            results = rNN(allSongs,allSongs[queryIndex],0.105);
+            results = rNN(allSongs,allSongs[queryIndex],0.200);
         }
         
         updateResultsDisplay();
